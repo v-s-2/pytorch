@@ -639,10 +639,9 @@ def _root_cast_forward_input(
     state: _FSDPState, module: torch.nn.Module, args, kwargs
 ) -> Tuple[Any, Any]:
     should_cast_forward_inputs = (
-        state._handle
-        and not state._handle._force_full_precision
-        and state.mixed_precision.cast_root_forward_inputs
-    )
+        (module.training or not state._use_full_prec_in_eval)
+        and (not state.handle._force_full_precision)
+    ) and state.mixed_precision.cast_root_forward_inputs
 
     if should_cast_forward_inputs:
         input_dtype: Optional[torch.dtype] = state.mixed_precision.param_dtype

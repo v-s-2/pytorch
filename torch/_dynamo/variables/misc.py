@@ -503,6 +503,8 @@ class GetAttrVariable(VariableTracker):
         assert isinstance(name, str)
         self.obj = obj
         self.name = name
+        if name == "_handle":
+            raise RuntimeError("Handle?")
         if isinstance(self.obj, variables.nn_module.FSDPManagedNNModuleVariable):
             raise RuntimeError("Nope!")
 
@@ -763,6 +765,14 @@ class SkipFilesVariable(VariableTracker):
         elif (
             self.value is cast
             and isinstance(args[0], variables.UserDefinedClassVariable)
+            and isinstance(args[1], variables.nn_module.FSDPManagedNNModuleVariable)
+        ):
+            new_obj = cast(args[0].value, args[1].value)
+            args[1].mutable_local = MutableLocal()
+            return tx.replace_all(args[1], variables.nn_module.FSDPManagedNNModuleVariable(new_obj, args[1].module_key, source=args[1].source))
+        elif (
+            self.value is cast
+            and isinstance(args[0], variables.UserDefinedClassVariable)
             and isinstance(args[1], variables.UserDefinedObjectVariable)
         ):
             new_obj = cast(args[0].value, args[1].value)
@@ -775,7 +785,7 @@ class SkipFilesVariable(VariableTracker):
         ):
             new_obj = cast(args[0].value, tx.output.nn_modules[args[1].module_key])
             args[1].mutable_local = MutableLocal()
-            return tx.replace_all(args[1], variables.UserDefinedObjectVariable(new_obj))
+            return tx.replace_all(args[1], args[1])
         elif (
             self.value is cast
         ):

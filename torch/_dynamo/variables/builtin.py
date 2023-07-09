@@ -1313,6 +1313,7 @@ class BuiltinVariable(VariableTracker):
             unimplemented(f"comparison {typestr(left)} {op} {typestr(right)}")
 
         def _resolve_getattr(get_attr_var):
+            print("Resolving getattr")
             assert isinstance(get_attr_var, variables.GetAttrVariable)
             try:
                 return get_attr_var.call_function(tx, [], {})
@@ -1406,6 +1407,9 @@ class BuiltinVariable(VariableTracker):
 
         # Would this invoke user code?        
         if isinstance(left, variables.UserDefinedObjectVariable) and isinstance(right, variables.UserDefinedObjectVariable):
+            return ConstantVariable(op(left.value, right.value))
+
+        if isinstance(left, variables.UserDefinedObjectVariable) and isinstance(right, variables.ConstantVariable):
             return ConstantVariable(op(left.value, right.value))
 
         _unimplemented()

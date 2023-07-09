@@ -638,9 +638,14 @@ def _root_pre_forward(
 def _root_cast_forward_input(
     state: _FSDPState, module: torch.nn.Module, args, kwargs
 ) -> Tuple[Any, Any]:
+    if hasattr(state, "handle"):
+        handle_full_precision = state.handle._force_full_precision
+    else:
+        handle_full_precision = False
+
     should_cast_forward_inputs = (
         (module.training or not state._use_full_prec_in_eval)
-        and (not state.handle._force_full_precision)
+        and not handle_full_precision
     ) and state.mixed_precision.cast_root_forward_inputs
 
     if should_cast_forward_inputs:

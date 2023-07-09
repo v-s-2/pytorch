@@ -185,7 +185,8 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         self.value_type = value_type or type(value)
         # if isinstance(self.value, (types.FunctionType, types.MethodType)):
             # raise RuntimeError(f"Trying to make a UDO func {self.value}")
-        
+        if getattr(self.value, '_is_fsdp_managed_module', False) and type(self) == UserDefinedObjectVariable:
+            raise RuntimeError(f"Cant make fsdp module as UDO {type(self)}")
         assert type(value) is self.value_type
 
     def __str__(self):
@@ -204,7 +205,7 @@ class UserDefinedObjectVariable(UserDefinedVariable):
 
     def reconstruct(self, codegen):
         if isinstance(self.value, torch.distributed.fsdp.fully_sharded_data_parallel.FullyShardedDataParallel):
-            raise RuntimeError("Attempted reconstruct?", self.value)
+            raise RuntimeError(f"Attempted reconstruct? {self.value}, {type(self.value)} {getattr(self.value, '_is_fsdp_managed_module', False)}")
         return super().reconstruct(codegen)
 
     @staticmethod
@@ -417,7 +418,8 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         getattr_fn = self._check_for_getattr()
 
         try:
-            # print("CHECKING FOR ATTR?", self, name)
+            if name == "_handle":
+                print("CHECKING FOR ATTR?", self, name)
             subobj = self._getattr_static(name)
         except AttributeError:
             subobj = None
@@ -427,7 +429,8 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                 ).call_function(tx, [ConstantVariable(name)], {})
             elif getattr_fn is not None:
                 unimplemented("UserDefined with non-function __getattr__")
-
+        if name == "_handle":
+            print("Got subobj!", subobj)
         if isinstance(subobj, property):
             return variables.UserMethodVariable(
                 subobj.fget, self, source=source, **options
@@ -486,6 +489,8 @@ class UserDefinedObjectVariable(UserDefinedVariable):
                 ),
             )
         ):
+            if name == "_handle":
+                print("NAME IN DICT")
             if source:
                 return VariableBuilder(tx, source)(subobj).add_options(options)
             elif ConstantVariable.is_literal(subobj):
@@ -535,6 +540,8 @@ class UserDefinedObjectVariable(UserDefinedVariable):
             # elif ConstantVariable.is_literal(subobj):
             #     return ConstantVariable(subobj, **options)
         print("GETATTR, but subobj?", subobj, self.source)
+        if isinstance(subobj, torch.distributed.fsdp.flat_param.FlatParamHandle):
+            return UserDefinedObjectVariable(subobj, **options)
         return variables.GetAttrVariable(self, name, **options)
 
     def call_hasattr(self, tx, name: str) -> "VariableTracker":

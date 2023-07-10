@@ -297,7 +297,6 @@ class UserDefinedObjectVariable(UserDefinedVariable):
         if name == "__contains__" and isinstance(self.value, dict):
             if isinstance(args[0], (UserDefinedObjectVariable, ConstantVariable)):
                 return ConstantVariable(args[0].value in self.value, **options)
-
         return super().call_method(tx, name, args, kwargs)
 
     def is_supported_random(self):

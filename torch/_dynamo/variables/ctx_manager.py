@@ -357,6 +357,9 @@ class CUDAStreamVariable(VariableTracker):
     def as_proxy(self):
         return self.proxy
 
+    def reconstruct(self, codegen):
+        return super().reconstruct(codegen)
+
 
 class WithExitFunctionVariable(VariableTracker):
     def __init__(self, ctx: ContextWrappingVariable, target, **kwargs):

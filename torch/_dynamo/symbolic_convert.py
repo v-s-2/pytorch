@@ -372,7 +372,7 @@ def generic_jump(truth_fn: typing.Callable[[object], bool], push: bool):
             # TODO link the torch.cond doc later
             raise exc.UserError(
                 exc.UserErrorType.DYNAMIC_CONTROL_FLOW,
-                "Dynamic control flow is not supported at the moment. Please use "
+                f"Dynamic control flow on {value} from {inst} is not supported at the moment. Please use "
                 "functorch.experimental.control_flow.cond to explicitly capture the control flow",
             )
 
@@ -690,7 +690,7 @@ class InstructionTranslatorBase(Checkpointable[InstructionTranslatorGraphState])
         self.output.compile_subgraph(
             self,
             partial_convert=True,
-            reason=GraphCompileReason("step_unsupported", [self.frame_summary()]),
+            reason=GraphCompileReason(f"step_unsupported {inst}", [self.frame_summary()]),
         )
         self.output.add_output_instructions(
             [create_jump_absolute(continue_inst)] + self.instructions

@@ -168,6 +168,8 @@ class TorchVariable(VariableTracker):
             raise RuntimeError("Nope")
 
         self.value = value
+        if value is torch.distributed.distributed_c10d.all_gather_into_tensor:
+            raise RuntimeError("???")
 
         # the remainder of this is just optional debug checks
         try:

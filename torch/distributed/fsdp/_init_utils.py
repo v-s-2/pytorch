@@ -434,9 +434,6 @@ def _init_runtime_state(
     state._communication_hook = _get_default_comm_hook(state.sharding_strategy)
     state._communication_hook_state = _get_default_comm_hook_state(state.process_group)
     state._hook_registered = False
-    # Used to prevent running the pre-backward hook multiple times
-    _ran_pre_backward_hook: Dict[FlatParamHandle, bool] = {}
-    state._ran_pre_backward_hook = _ran_pre_backward_hook
     return state
 
 
@@ -451,11 +448,7 @@ def _init_prefetching_state(
     _handles_prefetched: Dict[FlatParamHandle, bool] = {}
     state._handles_prefetched = _handles_prefetched
     # Used for guarding against mistargeted backward prefetches
-    _needs_pre_backward_unshard: Dict[FlatParamHandle, bool] = {}
-    state._needs_pre_backward_unshard = _needs_pre_backward_unshard
     # Used for guarding against mistargeted forward prefetches
-    _needs_pre_forward_unshard: Dict[FlatParamHandle, bool] = {}
-    state._needs_pre_forward_unshard = _needs_pre_forward_unshard
     # The data structures use tuples of handles to generalize over the case
     # where a module's forward involves multiple handles.
     return state

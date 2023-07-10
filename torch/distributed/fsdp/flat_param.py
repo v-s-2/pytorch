@@ -498,6 +498,8 @@ class FlatParamHandle:
         self._training_state = HandleTrainingState.IDLE
         self._debug_level = dist.get_debug_level()
         self._fully_sharded_module = fully_sharded_module
+        self.pre_forward_order_index = None
+        self.prefetched = False
         # NOTE: For the code path using this flag, we only skip calling
         # `_use_sharded_views()` and do not skip switching to the sharded flat
         # parameter since whether `self.flat_param` uses the sharded or

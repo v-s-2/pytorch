@@ -445,8 +445,6 @@ def _init_prefetching_state(
 ) -> _FSDPState:
     state.backward_prefetch = backward_prefetch
     state.forward_prefetch = forward_prefetch
-    _handles_prefetched: Dict[FlatParamHandle, bool] = {}
-    state._handles_prefetched = _handles_prefetched
     # Used for guarding against mistargeted backward prefetches
     # Used for guarding against mistargeted forward prefetches
     # The data structures use tuples of handles to generalize over the case

@@ -1,4 +1,5 @@
 import math
+import operator
 from functools import partial
 from typing import Dict, Optional
 
@@ -26,7 +27,8 @@ class BoundVars:
         self.unbounded_vars = dominated_nodes(
             node
             for node in self.loop_body.get_nodes()
-            if node.target in ["load", "reduction"] or "masked_subblock" in node.target
+            if node.target in ["load", "reduction", operator.getitem]
+            or "masked_subblock" in node.target
         )
         # To access this variable call `get_bounds()`
         self._bounds: Optional[Dict[torch.fx.Node, ValueRanges]] = {}

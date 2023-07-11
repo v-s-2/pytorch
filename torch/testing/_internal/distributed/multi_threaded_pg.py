@@ -349,6 +349,8 @@ class ProcessLocalGroup(dist.ProcessGroup):
         if isinstance(world, ThreadLocalWorld):
             world = world._get_world()
         self._world = weakref.ref(world)
+        self._ctx = torch.autograd.set_multithreading_enabled(False)
+
         ProcessLocalGroup._register(self)
 
     def size(self):
@@ -447,12 +449,16 @@ class ThreadLocalWorld:
 
 
 _old_pg_world = None
+_ctx_manager = None
 
 
 def _install_threaded_pg():
     global _old_pg_world
+    global _ctx_manager
     _old_pg_world = dist.distributed_c10d._world
     dist.distributed_c10d._world = ThreadLocalWorld()
+    _ctx_manager = torch.autograd.set_multithreading_enabled(False)
+
     return dist.distributed_c10d._world
 
 

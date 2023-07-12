@@ -987,7 +987,11 @@ def error_inputs_uniform(op, device, **kwargs):
 
 def error_inputs_linspace(op, device, **kwargs):
     yield ErrorInput(SampleInput(0, args=(3, -1)), error_type=RuntimeError, error_regex='number of steps must be non-negative')
-    yield ErrorInput(SampleInput(0, args=(3, 1.)), error_type=TypeError, error_regex='must be int, not float')
+    yield ErrorInput(
+        SampleInput(0, args=(3, 1.)),
+        error_type=TypeError,
+        error_regex="received an invalid combination of arguments - got \\(int, int, float\\)",
+    )
 
 
 def sample_inputs_linspace(op, device, dtype, requires_grad, **kwargs):
@@ -999,12 +1003,31 @@ def sample_inputs_linspace(op, device, dtype, requires_grad, **kwargs):
     for start, end, nstep in cases:
         if dtype == torch.uint8 and end < 0 or start < 0:
             continue
-        yield SampleInput(start, args=(end, nstep), kwargs={"dtype": dtype, "device": device})
+
+        tensor_options = {"dtype": dtype, "device": device}
+
+        yield SampleInput(start, args=(end, nstep), kwargs=tensor_options)
+        yield SampleInput(
+            torch.tensor(
+                start,
+                dtype=torch.float32 if isinstance(start, float) else torch.int64,
+                device=device
+            ),
+            args=(
+                torch.tensor(
+                    end,
+                    dtype=torch.float32 if isinstance(start, float) else torch.int64,
+                    device=device
+                ),
+                nstep
+            ),
+            kwargs=tensor_options
+        )
 
     yield SampleInput(1, args=(3, 1))
 
 
-def sample_inputs_logpace(op, device, dtype, requires_grad, **kwargs):
+def sample_inputs_logspace(op, device, dtype, requires_grad, **kwargs):
     ends = (-3, 0, 1.2, 2, 4)
     starts = (-2., 0, 1, 2, 4.3)
     nsteps = (0, 1, 2, 4)
@@ -1015,10 +1038,45 @@ def sample_inputs_logpace(op, device, dtype, requires_grad, **kwargs):
         if nstep == 1 and isinstance(start, float) and not (dtype.is_complex or dtype.is_floating_point):
             # https://github.com/pytorch/pytorch/issues/82242
             continue
+
+        tensor_options = {"dtype": dtype, "device": device}
+
         if base is None:
-            yield SampleInput(start, args=(end, nstep), kwargs={"dtype": dtype, "device": device})
+            yield SampleInput(start, args=(end, nstep), kwargs=tensor_options)
+            yield SampleInput(
+                torch.tensor(
+                    start,
+                    dtype=torch.float32 if isinstance(start, float) else torch.int64,
+                    device=device
+                ),
+                args=(
+                    torch.tensor(
+                        end,
+                        dtype=torch.float32 if isinstance(start, float) else torch.int64,
+                        device=device
+                    ),
+                    nstep),
+                kwargs=tensor_options
+            )
         else:
-            yield SampleInput(start, args=(end, nstep, base), kwargs={"dtype": dtype, "device": device})
+            yield SampleInput(start, args=(end, nstep, base), kwargs=tensor_options)
+            yield SampleInput(
+                torch.tensor(
+                    start,
+                    dtype=torch.float32 if isinstance(start, float) else torch.int64,
+                    device=device
+                ),
+                args=(
+                    torch.tensor(
+                        end,
+                        dtype=torch.float32 if isinstance(start, float) else torch.int64,
+                        device=device
+                    ),
+                    nstep,
+                    base,
+                ),
+                kwargs=tensor_options
+            )
 
     yield SampleInput(1, args=(3, 1, 2.))
 
@@ -11087,7 +11145,7 @@ op_db: List[OpInfo] = [
            supports_out=True,
            supports_autograd=False,
            error_inputs_func=error_inputs_linspace,
-           sample_inputs_func=sample_inputs_logpace,
+           sample_inputs_func=sample_inputs_logspace,
            skips=(
                # Tests that assume input is a tensor or sequence of tensors
                DecorateInfo(unittest.expectedFailure, 'TestCommon', 'test_variant_consistency_eager'),

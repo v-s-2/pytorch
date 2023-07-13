@@ -2810,7 +2810,8 @@ class CommonTemplate:
             torch.nn.ReLU(),
         )
         m.eval()
-        self.common(m, (torch.randn([16, 32]),), check_lowp=False)
+        with torch.no_grad():
+            self.common(m, (torch.randn([16, 32]),), check_lowp=False)
         if self.device != "cpu":
             self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 

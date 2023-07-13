@@ -386,8 +386,8 @@ void cumulative_op_impl(const Tensor& self,
               "(original dim is ",
               dim,
               ")");
-  
-  // cumprod appears broken on MacOS < 13.3 
+
+  // cumprod appears broken on MacOS < 13.3
   bool cpuFallback = false;
   if (!macOS13_3_plus && cumulativeOpType == MPSCumulativeOpType::CUMPROD) {
     TORCH_WARN_ONCE(op_name, "supported by MPS on MacOS 13.3+, please upgrade");
@@ -396,7 +396,7 @@ void cumulative_op_impl(const Tensor& self,
     TORCH_WARN_ONCE(op_name, "supported by MPS on MacOS 13+, please upgrade");
     cpuFallback = true;
   }
-  
+
   if (cpuFallback) {
     Tensor cpu_result;
     if (cumulativeOpType == MPSCumulativeOpType::CUMSUM) {

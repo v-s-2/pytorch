@@ -406,6 +406,22 @@ class SymPyValueRangeAnalysis:
 
         return ValueRanges.coordinatewise_increasing_map(a, b, fn_)
 
+    @classmethod
+    def floor(cls, x):
+        return ValueRanges.increasing_map(x, sympy.functions.elementary.integers.floor)
+
+    @classmethod
+    def ceil(cls, x):
+        return ValueRanges.increasing_map(x, sympy.functions.elementary.integers.ceiling)
+
+    # It's used in some models on symints
+    @staticmethod
+    def sqrt(x):
+        x = ValueRanges.wrap(x)
+        if x.lower < 0:
+            return ValueRanges.unknown()
+        return ValueRanges.increasing_map(x, sympy.sqrt)
+
 
 class ValueRangeAnalysis(SymPyValueRangeAnalysis):
     def __init__(self):
@@ -500,13 +516,6 @@ class ValueRangeAnalysis(SymPyValueRangeAnalysis):
         return cls.add(a, cls.neg(b))
 
     @staticmethod
-    def sqrt(x):
-        x = ValueRanges.wrap(x)
-        if x.lower < 0:
-            return ValueRanges.unknown()
-        return ValueRanges.increasing_map(x, sympy.sqrt)
-
-    @staticmethod
     def where(a, b, c):
         b = ValueRanges.wrap(b)
         c = ValueRanges.wrap(c)
@@ -516,14 +525,6 @@ class ValueRangeAnalysis(SymPyValueRangeAnalysis):
             return ValueRanges(sympy.And(b.lower, c.lower), sympy.Or(b.upper, c.upper))
         else:
             return ValueRanges(sympy.Min(b.lower, c.lower), sympy.Max(b.upper, c.upper))
-
-    @classmethod
-    def floor(cls, x):
-        return ValueRanges.increasing_map(x, sympy.functions.elementary.integers.floor)
-
-    @classmethod
-    def ceil(cls, x):
-        return ValueRanges.increasing_map(x, sympy.functions.elementary.integers.ceiling)
 
     def __getattr__(self, name):
         log.warning("unhandled ValueRange op %s", name)
@@ -541,4 +542,4 @@ def bound_sympy(expr: sympy.Expr, ranges: Dict[sympy.Symbol, ValueRanges]) -> Va
             for s in dynamic_shapes:
                 ranges[s] = ValueRanges(2, math.inf)  # type: ignore[index]
 
-    return sympy_interp(SymPyValueRangeAnalysis(), ranges, expr)
+    return sympy_interp(SymPyValueRangeAnalysis, ranges, expr)

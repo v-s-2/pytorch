@@ -319,6 +319,7 @@ class WrapperCodeGen(CodeGen):
                 from torch import empty_strided, as_strided, device
                 from {codecache.__name__} import AsyncCompile
                 from torch._inductor.select_algorithm import extern_kernels
+                from torch._inductor.codegen.multi_kernel import MultiKernelCall
 
                 aten = torch.ops.aten
                 assert_size_stride = torch._C._dynamo.guards.assert_size_stride
@@ -668,7 +669,7 @@ class WrapperCodeGen(CodeGen):
         with output.indent():
             output.writelines(
                 [
-                    "from torch._inductor.utils import compiled_module_main",
+                    "from torch._inductor.wrapper_benchmark import compiled_module_main",
                     f"compiled_module_main('{get_benchmark_name()}', benchmark_compiled_module)",
                 ]
             )

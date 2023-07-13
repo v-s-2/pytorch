@@ -386,8 +386,18 @@ void cumulative_op_impl(const Tensor& self,
               "(original dim is ",
               dim,
               ")");
-  if (!is_macos_13_or_newer()) {
-    TORCH_WARN_ONCE(op_name, " supported by MPS on MacOS 13+, please upgrade");
+  
+  // cumprod appears broken on MacOS < 13.3 
+  bool cpuFallback = false;
+  if (!macOS13_3_plus && cumulativeOpType == MPSCumulativeOpType::CUMPROD) {
+    TORCH_WARN_ONCE(op_name, "supported by MPS on MacOS 13.3+, please upgrade");
+    cpuFallback = true;
+  } else if (!is_macos_13_or_newer()) {
+    TORCH_WARN_ONCE(op_name, "supported by MPS on MacOS 13+, please upgrade");
+    cpuFallback = true;
+  }
+  
+  if (cpuFallback) {
     Tensor cpu_result;
     if (cumulativeOpType == MPSCumulativeOpType::CUMSUM) {
       cpu_result = self.to(at::Device(kCPU)).cumsum(dim, dtype);

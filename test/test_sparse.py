@@ -4850,7 +4850,6 @@ class TestSparseAny(TestCase):
 
 
     @onlyCUDA
-    @unittest.skipIf(TEST_WITH_ROCM, "ROCm doesn't support CUTLASS")
     @dtypes(torch.int8, torch.half, torch.bfloat16)
     def test_structured_sparse_linear(self, device, dtype):
         def make_tensor(shape, dtype):

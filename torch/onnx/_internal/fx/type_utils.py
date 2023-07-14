@@ -29,9 +29,11 @@ class TensorLike(Protocol):
         ...
 
 
-def is_torch_complex_dtype(tensor: TensorLike) -> bool:
+def is_torch_complex_dtype(tensor_or_dtype: TensorLike | torch.dtype) -> bool:
     # NOTE: This is needed as TorchScriptTensor is nor supported by torch.is_complex()
-    return tensor.dtype in _COMPLEX_TO_FLOAT
+    if isinstance(tensor_or_dtype, torch.dtype):
+        return tensor_or_dtype in _COMPLEX_TO_FLOAT
+    return tensor_or_dtype.dtype in _COMPLEX_TO_FLOAT
 
 
 def from_complex_to_float(dtype: torch.dtype) -> torch.dtype:

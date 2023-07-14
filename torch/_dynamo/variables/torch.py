@@ -538,6 +538,30 @@ class TorchVariable(VariableTracker):
             assert len(args) == 1, "Expected one arg (pg)"
             assert isinstance(args[0], ProcessGroupVariable)
             return ConstantVariable(self.value(args[0].as_python_constant()))
+        elif (
+            inspect.isfunction(self.value)
+            and torch.distributed.is_available()
+            and self.value is torch.distributed._tensor.api.DTensor.from_local
+        ):
+            # rewrite non-primitive args/kwargs to be included in the on-the-fly prim function
+            # and rewrite args to have only proxyable args, then insert call_function
+            args_as_value = [x.as_python_constant() for x in args[1:]]
+
+            def fn_with_prim_types(x, **kwargs):
+                return self.value(x, *args_as_value, **kwargs)
+
+            # attach the same function name for better debugging
+            fn_with_prim_types.__name__ = "prim " + self.value.__name__
+
+            return wrap_fx_proxy(
+                tx=tx,
+                proxy=tx.output.create_proxy(
+                    "call_function",
+                    fn_with_prim_types,
+                    *proxy_args_kwargs([args[0]], kwargs),
+                ),
+                **options,
+            )
         elif self.value == torch.nn.init._calculate_correct_fan:
             return UserFunctionVariable(
                 torch.nn.init._calculate_correct_fan, **options

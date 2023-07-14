@@ -10583,6 +10583,9 @@ class TestConsistency(TestCaseMPS):
             if (op.name == "tensor_split" and isinstance(mps_args[1], torch.Tensor)):
                 mps_args[1] = cpu_args[1]
 
+            print("inputs:", cpu_args, cpu_kwargs)
+            print("outputs:", mps_args, mps_kwargs)
+
             cpu_out = op(*cpu_args, **cpu_kwargs)
             mps_out = op(*mps_args, **mps_kwargs)
 
@@ -10610,8 +10613,9 @@ class TestConsistency(TestCaseMPS):
                 atol = None
                 rtol = None
 
+            print("cpu out:", cpu_out)
+            print("mps out:", mps_out)
             self.assertEqual(cpu_out, mps_out, atol=atol, rtol=rtol)
-
 
             #
             # Backward check

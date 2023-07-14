@@ -12,6 +12,8 @@ import torch._dynamo.test_case
 import torch._dynamo.testing
 import torch.distributed as dist
 
+from torch._dynamo.testing import skipIfNotPy311
+
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.testing._internal.common_utils import find_free_port
 from torch.testing._internal.inductor_utils import HAS_CUDA
@@ -407,6 +409,83 @@ print("arf")
             env=env,
         )
         self.assertIn("[rank0]:", stderr.decode("utf-8"))
+        
+    @skipIfNotPy311
+    @make_logging_test(trace_call=True)
+    def test_trace_call(self, records):
+        def fn(x, y):
+            return (x * 2) @ (y * 3)
+
+        fn_opt = torch._dynamo.optimize("eager")(fn)
+        fn_opt(torch.randn(10, 20), torch.randn(20, 30))
+
+        self.assertEqual(len(records), 3)
+        expected = (
+            """\
+            return (x * 2) @ (y * 3)
+                    ~~^~~""",
+            """\
+            return (x * 2) @ (y * 3)
+                              ~~^~~""",
+            """\
+            return (x * 2) @ (y * 3)
+                   ~~~~~~~~^~~~~~~~~""",
+        )
+        for record, answer in zip(records, expected):
+            self.assertIn(answer, record.getMessage())
+
+    @skipIfNotPy311
+    @make_logging_test(trace_call=True)
+    def test_trace_call_inline_call(self, records):
+        def g(x):
+            return x * 2
+
+        def f(x):
+            return g(g(x))
+
+        fn_opt = torch._dynamo.optimize("eager")(f)
+        fn_opt(torch.randn(3, 3))
+
+        self.assertEqual(len(records), 4)
+        expected = (
+            """\
+            return g(g(x))
+                     ^^^^""",
+            """\
+            return x * 2
+                   ~~^~~""",
+            """\
+            return g(g(x))
+                   ^^^^^^^""",
+            """\
+            return x * 2
+                   ~~^~~""",
+        )
+        for record, answer in zip(records, expected):
+            self.assertIn(answer, record.getMessage())
+
+    @skipIfNotPy311
+    @make_logging_test(trace_call=True)
+    def test_trace_call_graph_break(self, records):
+        def fn(x):
+            x = x * 2
+            torch._dynamo.graph_break()
+            return x * 3
+
+        fn_opt = torch._dynamo.optimize("eager")(fn)
+        fn_opt(torch.randn(3, 3))
+
+        self.assertEqual(len(records), 2)
+        expected = (
+            """\
+            x = x * 2
+                ~~^~~""",
+            """\
+            return x * 3
+                   ~~^~~""",
+        )
+        for record, answer in zip(records, expected):
+            self.assertIn(answer, record.getMessage())
 
 
 # single record tests
@@ -421,6 +500,7 @@ exclusions = {
     "perf_hints",
     "not_implemented",
     "trace_source",
+    "trace_call",
     "custom_format_test_artifact",
 }
 for name in torch._logging._internal.log_registry.artifact_names:

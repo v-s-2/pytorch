@@ -1,3 +1,4 @@
+import copy
 import functools
 
 import torch
@@ -184,6 +185,79 @@ def register_quantization_lowerings():
         [],  # unary_scalars
         "",  # unary_algorithm
     )
+
+
+dequant_node_pattern = CallFunction(
+    aten.mul.Tensor,
+    CallFunction(
+        aten.sub.Tensor,
+        CallFunction(
+            prims.convert_element_type.default,
+            KeywordArg("x"),
+            KeywordArg("o_dtype"),  # dtype=torch.float32
+        ),
+        KeywordArg("dequant_zp"),  # dequant zp
+    ),
+    KeywordArg("dequant_scale"),  # dequant_scale
+)
+
+
+def _is_valid_dequant_promotion_pattern(match):
+    to_fp32_node = match.nodes[0]
+    sub_node = match.nodes[1]
+    mul_node = match.nodes[2]
+    assert mul_node.target is torch.ops.aten.mul.Tensor
+    # dequant pattern has more than 1 users to be promoted
+    return len(list(mul_node.users)) > 1
+
+
+def _register_dequant_promotion_pass(pattern):
+    @register_freezing_graph_pattern(
+        pattern,
+        extra_check=_is_valid_dequant_promotion_pattern,
+        pass_number=0,
+    )  # pass_number=0, so it will run before insert weight prepack node
+    def dequant_promotion(match: Match, *args, **kwargs):
+        to_fp32_node = match.nodes[0]
+        sub_node = match.nodes[1]
+        mul_node = match.nodes[2]
+        graph = match.graph
+        if len(list(mul_node.users)) > 1:
+            # Dequant Node used by multiply nodes
+            # Will do dequant promotion, so each used node has a seperate dequant pattern connected
+            for index in range(len(list(mul_node.users)) - 1):
+                user_node = list(mul_node.users)[index]
+                with graph.inserting_before(user_node):
+                    # Step1: Duplicate the mul node
+                    new_mul_node = graph.call_function(
+                        torch.ops.aten.mul.Tensor,
+                        args=mul_node.args,
+                        kwargs=mul_node.kwargs,
+                    )
+                    new_mul_node.meta = copy.copy(mul_node.meta)
+                    user_node.replace_input_with(mul_node, new_mul_node)
+
+                    with graph.inserting_before(new_mul_node):
+                        # Step2: Duplicate the sub node
+                        new_sub_node = graph.call_function(
+                            torch.ops.aten.sub.Tensor,
+                            args=sub_node.args,
+                            kwargs=sub_node.kwargs,
+                        )
+                        new_sub_node.meta = copy.copy(sub_node.meta)
+                        new_mul_node.replace_input_with(sub_node, new_sub_node)
+
+                        with graph.inserting_before(new_sub_node):
+                            # Step3: Duplicate the to_fp32 node
+                            new_to_fp32_node = graph.call_function(
+                                torch.ops.prims.convert_element_type.default,
+                                args=to_fp32_node.args,
+                                kwargs=to_fp32_node.kwargs,
+                            )
+                            new_to_fp32_node.meta = copy.copy(to_fp32_node.meta)
+                            new_sub_node.replace_input_with(
+                                to_fp32_node, new_to_fp32_node
+                            )
 
 
 def _is_valid_dequant_conv2d_pattern(match):
@@ -376,6 +450,7 @@ def _generate_qconv_weight_prepack_patterns():
 
 @functools.lru_cache(None)
 def _register_quantization_weight_pack_pass():
+    _register_dequant_promotion_pass(dequant_node_pattern)
     weight_prepack_patterns = _generate_qconv_weight_prepack_patterns()
     for weight_prepack_pattern in weight_prepack_patterns:
         _register_qconv_weight_prepack_pass(weight_prepack_pattern)
